@@ -5,8 +5,11 @@ import "fmt"
 type tokenTag int
 
 const (
-	_ParentLeft  tokenTag = iota // Left '('
+	_Seal        tokenTag = iota // 'seal'
+	_ParentLeft                  // Left '('
 	_ParentRight                 // Right ')'
+	_BraceLeft                   // Left '{'
+	_BraceRight                  // Right '}'
 	_Ident                       // Identifier
 	_Integer                     // Integer lit
 	_Float                       // Float number lit
@@ -19,16 +22,30 @@ const (
 	_DoubleQuote                 // Double quote "
 	_Comment                     // Comment
 	_Semi                        // ';' or '\n'
+	_Colon                       // ':'
+	_Assign                      // '='
+	_Minus                       // '-'
+	_Arrow                       // '->'
+	_Symbol                      // symbols, e.g., == != >=
 	_EOF                         // End Of File
 )
 
 func (tag tokenTag) String() string {
 	switch tag {
+	case _Seal:
+		return "Seal"
+
 	case _ParentLeft:
 		return "ParentLeft"
 
 	case _ParentRight:
 		return "ParentRight"
+
+	case _BraceLeft:
+		return "BraceLeft"
+
+	case _BraceRight:
+		return "BraceRight"
 
 	case _Ident:
 		return "Ident"
@@ -54,11 +71,26 @@ func (tag tokenTag) String() string {
 	case _Semi:
 		return "Semicolon"
 
+	case _Colon:
+		return "Colon"
+
+	case _Assign:
+		return "Assign"
+
 	case _Quote:
 		return "Quote"
 
 	case _DoubleQuote:
 		return "DoubleQuote"
+
+	case _Arrow:
+		return "Arrow"
+
+	case _Minus:
+		return "Minus"
+
+	case _Symbol:
+		return "Symbol"
 
 	case _EOF:
 		return "EOF"

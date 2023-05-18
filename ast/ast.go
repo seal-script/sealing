@@ -5,7 +5,7 @@ import "github.com/seal-script/sealing/utils"
 type Location = utils.Location
 
 type Node interface {
-	// Pos() returns the position associated with the node as follows:
+	// Locate() returns the position associated with the node as follows:
 	// 1) The position of a node representing a terminal syntax production
 	//    (Name, BasicLit, etc.) is the position of the respective production
 	//    in the source.

@@ -57,9 +57,7 @@ func (s *scanner) next() error {
 	// Indentifier
 	if isLetter(s.ch) || s.ch >= utf8.RuneSelf && s.atIdentChar(true) {
 		s.nextch()
-		token := s.ident()
-		s.token = token
-		return nil
+		return s.ident()
 	}
 	switch s.ch {
 	case -1:
@@ -80,6 +78,14 @@ func (s *scanner) next() error {
 		s.nextch()
 		s.token = Token{_ParentRight, ")"}
 
+	case '{':
+		s.nextch()
+		s.token = Token{_BraceLeft, "{"}
+
+	case '}':
+		s.nextch()
+		s.token = Token{_BraceRight, "}"}
+
 	case '\'':
 		s.nextch()
 		s.token = Token{_Quote, "'"}
@@ -93,8 +99,13 @@ func (s *scanner) next() error {
 		s.token = Token{_Semi, ";"}
 
 	default:
-		s.errorf("invalid character %#U", s.ch)
-		s.nextch()
+		// fmt.Printf("%c\n", '('+5)
+		// s.errorf("invalid character %#U", s.ch)
+		// s.nextch()
+		// if unicode.IsSymbol(s.ch) {
+		return s.symbol()
+		// }
+		// return fmt.Errorf("invalid character %#U", s.ch)
 	}
 	return nil
 }
@@ -104,7 +115,7 @@ func isLetter(ch rune) bool  { return 'a' <= lower(ch) && lower(ch) <= 'z' || ch
 func isDecimal(ch rune) bool { return '0' <= ch && ch <= '9' }
 func isHex(ch rune) bool     { return '0' <= ch && ch <= '9' || 'a' <= lower(ch) && lower(ch) <= 'f' }
 
-func (s *scanner) ident() Token {
+func (s *scanner) ident() error {
 	// accelerate common case (7bit ASCII)
 	for isLetter(s.ch) || isDecimal(s.ch) {
 		s.nextch()
@@ -120,14 +131,38 @@ func (s *scanner) ident() Token {
 	// possibly a keyword
 	lit := s.segment()
 	if string(lit) == "let" {
-		return Token{_Let, "let"}
+		s.token = Token{_Let, "let"}
+		return nil
 	}
 	if string(lit) == "type" {
-		return Token{_Type, "type"}
+		s.token = Token{_Type, "type"}
+		return nil
 	}
 
 	s.nlsemi = true
-	return Token{_Ident, string(lit)}
+	s.token = Token{_Ident, string(lit)}
+	return nil
+}
+
+func (s *scanner) symbol() error {
+	// for unicode.IsSymbol(s.ch) || isLetter(s.ch) || isDecimal(s.ch) {
+	// 	s.nextch()
+	// }
+	for !unicode.IsSpace(s.ch) && s.ch != '(' && s.ch != ')' {
+		s.nextch()
+	}
+	lit := string(s.segment())
+	switch lit {
+	case "=":
+		s.token = Token{_Assign, "="}
+	case ":":
+		s.token = Token{_Colon, ":"}
+	case "->":
+		s.token = Token{_Arrow, "->"}
+	default:
+		s.token = Token{_Symbol, string(lit)}
+	}
+	return nil
 }
 
 func (s *scanner) atIdentChar(first bool) bool {
