@@ -10,19 +10,49 @@ import (
 	"github.com/seal-script/sealing/utils"
 )
 
+// A Location is a triple: (<File>, <line>, <col>)
+type Location = utils.Location
+type TokenStream = scanner
+
+// An interface for parsing
 type Parsing interface {
 	ParseDecl() (ast.Decl, error)
 	ParseExpr() (ast.Expr, error)
 }
 
-type Location = utils.Location
+// Error type for parsing
+type ParsingError struct {
+	error
+	Location Location
+}
 
+// Error wrapper
+func errorOf(location Location, format string, args ...any) ParsingError {
+	return ParsingError{
+		error:    fmt.Errorf(format, args...),
+		Location: location,
+	}
+}
+
+func (pErr *ParsingError) String() string {
+	return fmt.Sprintf(
+		`
+ParsingError {
+	%v,
+	location: %v,
+}
+`, pErr.error, pErr.Location,
+	)
+}
+
+// better way to debug?
 const debug = false
 const trace = false
 
+// The main parser
 type Parser struct {
 	scanner
-	location Location
+	filePath string
 }
 
 func NewParser(t *testing.T, in io.Reader) Parser {
@@ -30,7 +60,7 @@ func NewParser(t *testing.T, in io.Reader) Parser {
 	p.Init(in, func(err error) {
 		t.Log(err.Error())
 	})
-	p.next()
+	p.next() // Fill buffer
 	return p
 }
 
@@ -40,10 +70,14 @@ func (p *Parser) Init(r io.Reader, errHandler func(error)) {
 	}, 0)
 }
 
+func (p *Parser) errorOf(format string, args ...any) ParsingError {
+	return errorOf(p.Locate(), format, args...)
+}
+
 // Parsing a file
 func (p *Parser) ParseFile() (*ast.File, error) {
 	f := new(ast.File)
-	f.Location = p.Locate(p.line, p.col)
+	f.Location = p.Locate()
 
 	// While not end of file
 	for p.token.tag != _EOF {
@@ -53,18 +87,16 @@ func (p *Parser) ParseFile() (*ast.File, error) {
 			return nil, err
 		}
 		f.DeclList = append(f.DeclList, decl)
-		p.next()
+		p.next() // seperator?
 	}
 	return f, nil
 }
 
 func (p *Parser) ParseDecl() (ast.Decl, error) {
-	// p.next()
-	// Declarations
 	if p.token.tag == _Ident {
 		fName, err := p.ParseNameExpr()
 		if err != nil {
-			return nil, fmt.Errorf("Error of parser: %#v\n", err)
+			return nil, err
 		}
 		switch p.token.tag {
 		case _Colon:
@@ -72,14 +104,14 @@ func (p *Parser) ParseDecl() (ast.Decl, error) {
 		case _Ident, _Assign, _ParentLeft, _Integer:
 			return p.ParseFuncDecl(fName)
 		default:
-			return nil, fmt.Errorf(
-				"Error of parser: expected ':' | '=' | identifier, found %#v\n",
+			return nil, p.errorOf(
+				"Expected ':' | '=' | identifier, found %#v\n",
 				p.token,
 			)
 		}
 	}
-	return nil, fmt.Errorf(
-		"Error of parser: expected ':' | '=' | identifier, found %#v\n",
+	return nil, p.errorOf(
+		"Expected identifier, found %#v\n",
 		p.token,
 	)
 }
@@ -116,7 +148,7 @@ func (p *Parser) ParseFuncDecl(fName *ast.Name) (*ast.FuncDecl, error) {
 		decl.Body = body
 
 	default:
-		return nil, fmt.Errorf("Error while parsing function declaration")
+		return nil, p.errorOf("Error while parsing function declaration")
 	}
 	return decl, nil
 }
@@ -153,9 +185,9 @@ func (p *Parser) ParseType() (ast.Type, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.CallExpr{
-			Fun:     &ast.Name{Value: "->"},
-			ArgList: []ast.Expr{t, ts},
+		return &ast.FuncType{
+			Context: []ast.Field{},
+			Types:   []ast.Type{t, ts},
 		}, nil
 
 	case _ParentLeft:
@@ -175,12 +207,12 @@ func (p *Parser) ParseType() (ast.Type, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ast.CallExpr{
-			Fun:     &ast.Name{Value: "->"},
-			ArgList: []ast.Expr{t, ts},
+		return &ast.FuncType{
+			Context: []ast.Field{},
+			Types:   []ast.Type{t, ts},
 		}, nil
 	default:
-		return nil, fmt.Errorf("Error of parser: ParseType: Unexpected token: %#v\n", p.token)
+		return nil, p.errorOf("ParseType: Unexpected token: %#v\n", p.token)
 	}
 }
 
@@ -223,7 +255,7 @@ func (p *Parser) ParseExpr() (ast.Expr, error) {
 		}
 		return expr, nil
 	default:
-		return nil, fmt.Errorf("ParseExpr error: encounter %#v", p.token)
+		return nil, p.errorOf("ParseExpr error: encounter %#v", p.token)
 	}
 }
 
@@ -235,7 +267,7 @@ func (p *Parser) ParseNameExpr() (*ast.Name, error) {
 		p.next()
 		return name, nil
 	default:
-		return nil, fmt.Errorf("ParseNameExpr error: encounter %#v", p.token)
+		return nil, p.errorOf("ParseNameExpr error: encounter %#v", p.token)
 	}
 }
 
@@ -259,7 +291,7 @@ func (p *Parser) ParsePatternExpr() (ast.Pattern, error) {
 	// case _Float:
 	// return p.Parse
 	default:
-		return nil, fmt.Errorf("Error of parser: ParsePatternExpr: %#v\n", p.token)
+		return nil, p.errorOf("ParsePatternExpr: %#v\n", p.token)
 	}
 }
 
@@ -275,14 +307,14 @@ func (p *Parser) ParseIntegerExpr() (*ast.Integer, error) {
 		p.next()
 		return j, nil
 	default:
-		return nil, fmt.Errorf("ParseIntegerExpr error: encounter %#v", p.token)
+		return nil, p.errorOf("ParseIntegerExpr error: encounter %#v", p.token)
 	}
 }
 
 // `f x...`
 func (p *Parser) ParseFuncCallExpr() (*ast.CallExpr, error) {
 	if !(p.token.tag == _Ident || p.token.tag == _ParentLeft) {
-		return nil, fmt.Errorf("ParseFuncCallExpr error: encounter %#v", p.token)
+		return nil, p.errorOf("ParseFuncCallExpr error: encounter %#v", p.token)
 	}
 	fCall := new(ast.CallExpr)
 	switch p.token.tag {
@@ -332,15 +364,15 @@ func (p *Parser) ParseFuncCallExpr() (*ast.CallExpr, error) {
 		}
 		return fCall, nil
 	default:
-		return nil, fmt.Errorf("ParseFuncCallExpr error: encounter %#v", p.token)
+		return nil, p.errorOf("ParseFuncCallExpr error: encounter %#v", p.token)
 	}
 }
 
-func (p *Parser) Locate(line, col uint) Location {
+func (p *Parser) Locate() Location {
 	return Location{
-		FilePath: p.location.FilePath,
-		Line:     line,
-		Col:      col,
+		FilePath: p.filePath,
+		Line:     p.line,
+		Col:      p.col,
 	}
 }
 

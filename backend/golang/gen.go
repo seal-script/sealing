@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/seal-script/sealing/ast"
+	"github.com/seal-script/sealing/utils"
 )
 
 type Generator[Ir any] interface {
@@ -11,19 +12,19 @@ type Generator[Ir any] interface {
 }
 
 type GenString struct {
-	TEnv map[*ast.Name]ast.Type
-	FEnv map[*ast.Name]*ast.FuncDecl
+	TEnv map[string]ast.Type
+	FEnv map[string]*ast.FuncDecl
 }
 
 func (g *GenString) Gen(file *ast.File) (string, error) {
 	decls := file.DeclList
-	for _, decl := range decls {
+	for i, decl := range decls {
 		switch d := decl.(type) {
 		case *ast.TypeDecl:
-			g.TEnv[d.Name] = d.Type
+			g.TEnv[d.Name.Value] = d.Type
 		case *ast.FuncDecl:
-			d.Type = g.TEnv[d.Name]
-			g.FEnv[d.Name] = d
+			decls[i].(*ast.FuncDecl).Type = g.TEnv[d.Name.Value]
+			g.FEnv[d.Name.Value] = d
 		default:
 			return "", fmt.Errorf("Error of generator: Gen %#v", decl)
 		}
@@ -41,12 +42,34 @@ func (g *GenString) Gen(file *ast.File) (string, error) {
 
 func GenFunc(fDecl *ast.FuncDecl) (string, error) {
 	ans := fmt.Sprintf(`func %s`, fDecl.Name.Value)
-	// utils.Todo()
+	utils.Todo()
+	ts := fDecl.Type.(*ast.FuncType).Types
+	ps := fDecl.Params
+	params := ""
+	for i, p := range ps {
+		e, err := GenExpr(p.(ast.Expr))
+		if err != nil {
+			return "", err
+		}
+		t, err := GenType(ts[i])
+		if err != nil {
+			return "", nil
+		}
+		pair := fmt.Sprintf("%s %s", e, t)
+		if params == "" {
+			params = pair
+		} else {
+			params += ", " + pair
+		}
+	}
+	ans += fmt.Sprintf("(%s)", params)
+	ans += " {\n"
 	body, err := GenExpr(fDecl.Body)
 	if err != nil {
 		return "", err
 	}
-	ans += body
+	ans += "return " + body
+	ans += "\n}"
 	return ans, nil
 }
 
@@ -58,6 +81,41 @@ func GenExpr(expr ast.Expr) (string, error) {
 		return e.Value, nil
 	default:
 		return "", fmt.Errorf("Error of generator: GenExpr: Unknown expr: %#v", e)
+	}
+}
+
+func GenType(tpe ast.Type) (string, error) {
+	switch t := tpe.(type) {
+	case *ast.FuncType:
+		// fmt.Println(t.Types)
+		rest, err := GenType(&ast.FuncType{
+			Context: t.Context,
+			Types:   t.Types[1:],
+		})
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("func(%s) %s", t.Types[0], rest), nil
+	case *ast.CallExpr:
+		ans := fmt.Sprintf("%v", t.Fun)
+		param := ""
+		for _, arg := range t.ArgList {
+			x, err := GenType(arg)
+			if err != nil {
+				return "", err
+			}
+			if param == "" {
+				param = x
+			} else {
+				param += ", " + x
+			}
+		}
+		if param != "" {
+			ans += fmt.Sprintf("[%s]", param)
+		}
+		return ans, nil
+	default:
+		return "", fmt.Errorf("Error of generator: Unknown type: %#v\n", t)
 	}
 }
 

@@ -11,8 +11,8 @@ import (
 
 func TestGen(t *testing.T) {
 	data := []byte(`
-		succ : Int -> Int;
-		succ x = (+) x 1
+		test : Int -> Int;
+		test x = add x 1
 	`)
 	var in io.Reader = bytes.NewReader(data)
 
@@ -26,8 +26,8 @@ func TestGen(t *testing.T) {
 	t.Logf("%v", file)
 
 	var g GenString = GenString{
-		TEnv: map[*ast.Name]ast.Type{},
-		FEnv: map[*ast.Name]*ast.FuncDecl{},
+		TEnv: map[string]ast.Type{},
+		FEnv: map[string]*ast.FuncDecl{},
 	}
 	s, err := g.Gen(file)
 	if err != nil {

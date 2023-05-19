@@ -55,7 +55,7 @@ func TestParseFuncCallExpr(t *testing.T) {
 	// p.next()
 	res, err := p.ParseDecl()
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%v", err)
 		return
 	}
 	t.Log("-------------------------\n")

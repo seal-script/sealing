@@ -8,16 +8,16 @@ type Type interface {
 
 type (
 	FuncType struct {
-		Types []Type
+		Context []Field
+		Types   []Type
 		atype
+		expr
 	}
 )
 
 type atype struct{}
 
 func (*atype) aType() {}
-
-// func (*atype) aExpr() {}
 
 func (*CallExpr) aType() {}
 

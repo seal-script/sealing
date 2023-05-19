@@ -91,11 +91,11 @@ func (*decl) aDecl() {}
 func (funcDecl *FuncDecl) String() string {
 	return fmt.Sprintf(
 		`Function Decl {
-			Name: %s,
-			Type: %s : %v,
-			Params: %s,
-			Body: %s : %v,
-		}`,
+	Name: %s,
+	Type: %s : %v,
+	Params: %s,
+	Body: %s : %v,
+}`,
 		funcDecl.Name,
 		funcDecl.Type,
 		reflect.TypeOf(funcDecl.Type),
@@ -108,9 +108,9 @@ func (funcDecl *FuncDecl) String() string {
 func (typeDecl *TypeDecl) String() string {
 	return fmt.Sprintf(
 		`Type Decl {
-			Name: %s,
-			Type: %s,
-		}`,
+	Name: %s,
+	Type: %s,
+}`,
 		typeDecl.Name,
 		typeDecl.Type,
 	)
